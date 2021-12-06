@@ -1,5 +1,4 @@
 <script>
-    //import {Chessboard} from "cm-chessboard"
 	import Chessboard from "chessboardjs";
 	import Chart from 'chart.js/auto';
 	import { data } from './example.js';
