@@ -1,5 +1,5 @@
 <script>
-    import {Chessboard} from "cm-chessboard"
+    //import {Chessboard} from "cm-chessboard"
 	import Chart from 'chart.js/auto';
 	import { data } from './example.js'
 	import { onMount } from 'svelte';
@@ -180,7 +180,7 @@
 				});
 
 				
-				new Chessboard(board, {position: FENS[FENS.length - 1]});
+				//new Chessboard(board, {position: FENS[FENS.length - 1]});
 				whiteChart.update();
 				blackChart.update();
 			});
