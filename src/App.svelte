@@ -1,12 +1,16 @@
 <script>
+    import {Chessboard} from "cm-chessboard"
 	import Chart from 'chart.js/auto';
 	import { data } from './example.js'
 	import { onMount } from 'svelte';
-	
+
 	let whiteGraph, blackGraph;
 	let DEPTH_VALUES = [1,5,10,15,20];
 	let QUERY_INTERVAL = 10;
 	let URL_ROOT = "https://sharp-api-qkzpapi3la-ue.a.run.app/sharpness";
+
+	let FENS = [];
+	let board;
 
 
 	let COLORS = [
@@ -54,9 +58,11 @@
 		let black_sharpness = [];
 		let white_eval = [];
 		let black_eval = [];
+		let fens = [];
 		let move = 0;
 		while (obj[move]) {
 			let evals = obj[move].evals;
+			fens.push(obj[move].fen);
 			if (move % 2 == 0) {
 				white_sharpness.push(metric(evals));
 				white_eval.push(Math.max(...evals));
@@ -64,10 +70,10 @@
 				black_sharpness.push(metric(evals));
 				black_eval.push(Math.max(...evals));
 			}
-
+			
 			move += 1;
 		}
-		return [white_sharpness, black_sharpness, white_eval, black_eval];
+		return [white_sharpness, black_sharpness, white_eval, black_eval, fens];
 	};
 
     onMount(() => {
@@ -129,9 +135,10 @@
 				let blackEvaluation = [];
 				for (let j = 0; j < query_results.length; j++) {
 					let result = query_results[j];
-					let [white_metric, black_metric, white_eval, black_eval] = parseData(result);
+					let [white_metric, black_metric, white_eval, black_eval, fens] = parseData(result);
 					whiteEvaluation = white_eval;
 					blackEvaluation = black_eval;
+					FENS = fens;
 					whiteData.labels = [];
 					blackData.labels = [];
 					for (let i = 0; i < white_metric.length; i++) {
@@ -172,6 +179,8 @@
 					order: -10
 				});
 
+				
+				new Chessboard(board, {position: FENS[FENS.length - 1]});
 				whiteChart.update();
 				blackChart.update();
 			});
@@ -183,25 +192,30 @@
 </script>
 
 
-<main class = "graph-panel">
+<main>
+	<graph-panel class = "graph-panel">
+		<div>
+			<canvas id="white-graph" bind:this={whiteGraph}>
+			</canvas>
+		</div>
+		<br/>
+		<div>
+			<canvas id="black-graph" bind:this={blackGraph}>
+			</canvas>
+		</div>
+	</graph-panel>
+
 	<div>
-		<canvas id="white-graph" bind:this={whiteGraph}>
-		</canvas>
-	</div>
-	<br/>
-	<div>
-		<canvas id="black-graph" bind:this={blackGraph}>
-		</canvas>
+		<board bind:this={board}></board>
 	</div>
 </main>
 
-
 <style>
-	main {
+	graph-panel {
 		display: flex;
 		flex-direction: column;
 	}
-	main > div {
+	graph-panel > div {
 		max-width: 600px;
 	}
 </style>
