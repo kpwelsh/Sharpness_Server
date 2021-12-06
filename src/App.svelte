@@ -1,102 +1,197 @@
 <script>
+	import Chart from 'chart.js/auto';
 	import { data } from './example.js'
 	import { onMount } from 'svelte';
-	let plot;
+	
+	let whiteGraph, blackGraph;
 	let DEPTH_VALUES = [1,5,10,15,20];
-	let graph_data = [];
 	let QUERY_INTERVAL = 10;
-	for (let d in DEPTH_VALUES) {
-		graph_data.push({
-			x: [],
-			y: [],
-			type: 'scatter'
+	let URL_ROOT = "https://sharp-api-qkzpapi3la-ue.a.run.app/sharpness";
+
+
+	let COLORS = [
+		'#377eb8',
+		'#4daf4a',
+		'#e41a1c',
+		'#984ea3',
+		'#ff7f00',
+		'black'
+	]
+
+	function legendClickHandler(e, legendItem, legend) {
+		let index = legendItem.datasetIndex;
+		console.log(e);
+		console.log(legendItem);
+		console.log(legend);
+
+		let ci = legend.chart;
+		[
+			ci.getDatasetMeta(index-1),
+			ci.getDatasetMeta(index),
+			ci.getDatasetMeta(index+1)
+		].forEach(function(meta) {
+			meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
 		});
-	}
+		ci.update();
+	};
+
+
+	let whiteData = {
+		labels : [],
+		datasets : []
+	};
+	let blackData = {
+		labels : [],
+		datasets : []
+	};
 	
 	function metric(evals) {
 		return evals.reduce((a, b) => Math.max(a, b)) - evals.reduce((a, b) => a + b) / evals.length;
 	}
 
 	function parseData(obj) {
-		let black = {
-			x: [],
-			y: [],
-			type : 'scatter'
-		};
-		let white = {
-			x : [],
-			y : [],
-			type : 'scatter'
-		};
-
-		for (let move in obj) {
-			let move_number = Math.round(move / 2);
-			let color;
+		let white_sharpness = [];
+		let black_sharpness = [];
+		let white_eval = [];
+		let black_eval = [];
+		let move = 0;
+		while (obj[move]) {
+			let evals = obj[move].evals;
 			if (move % 2 == 0) {
-				color = white;
+				white_sharpness.push(metric(evals));
+				white_eval.push(Math.max(...evals));
 			} else {
-				color = black;
+				black_sharpness.push(metric(evals));
+				black_eval.push(Math.max(...evals));
 			}
-			color.x.push(move_number);
-			color.y.push(metric(obj[move].evals));
-		}
 
-		return [white, black];
+			move += 1;
+		}
+		return [white_sharpness, black_sharpness, white_eval, black_eval];
 	};
 
-	function zip(a, b) {
-		let i = 0;
-		let res = [];
-		while (i < a.length && i < b.length) {
-			res.push([a[i], b[i]]);
-			i+=1;
-		}
-		return res;
-	}
-
     onMount(() => {
+		let whiteChartOptions = {
+			elements: {
+				point:{
+					radius: 0
+				}
+			},
+			borderColor: COLORS,
+			responsive: true,
+			plugins: {
+				borderColor: COLORS,
+				title: {
+					display: true,
+					text: 'White Sharpness'
+				},
+				legend: {
+					position: 'right'
+				}
+			},
+		};
+		let whiteChart = new Chart(whiteGraph, {
+			type: 'line',
+			data: whiteData,
+			options: whiteChartOptions,
+		});
+		let blackChartOptions = JSON.parse(JSON.stringify(whiteChartOptions));
+		blackChartOptions.plugins.title.text = 'Black Sharpness';
+		
+		let blackChart = new Chart(blackGraph, {
+			type: 'line',
+			data: blackData,
+			options: blackChartOptions,
+		});
+
+
 		let updateGraph = () => {
 			let query_promises = [];
 			for (let d of DEPTH_VALUES) {
-				let url = 'http://127.0.0.1:5000/?depth=' + d;
+				let url = URL_ROOT + `?game=${6}&depth=${d}`;
 				query_promises.push(
-					fetch(url, {mode:'cors'}).then((r) => r.json())
+					fetch(url)
+						.then(
+							r => {
+								if (r.body) {
+									return r.json();
+								}
+								return {};
+							})
 				);
 			}
 
 			Promise.all(query_promises).then((query_results) => {
-				let i = 0;
-				graph_data = [];
-				for (let group of zip(DEPTH_VALUES, query_results)) {
-					let d = group[0];
-					let result = group[1];
-					for (let trace of parseData(result)) {
-						graph_data.push(trace);
+				whiteData.datasets = []
+				blackData.datasets = []
+				
+				let whiteEvaluation = [];
+				let blackEvaluation = [];
+				for (let j = 0; j < query_results.length; j++) {
+					let result = query_results[j];
+					let [white_metric, black_metric, white_eval, black_eval] = parseData(result);
+					whiteEvaluation = white_eval;
+					blackEvaluation = black_eval;
+					whiteData.labels = [];
+					blackData.labels = [];
+					for (let i = 0; i < white_metric.length; i++) {
+						whiteData.labels.push(i);
+						blackData.labels.push(i);
 					}
-					i += 1;
+					
+					whiteData.datasets.push({
+						data: white_metric,
+						tension: 0.4,
+						label: `Depth ${DEPTH_VALUES[j]}`,
+						hidden: j < DEPTH_VALUES.length-1,
+						order: 10 - j
+					});
+					blackData.datasets.push({
+						data: black_metric,
+						tension: 0.4,
+						label: `Depth ${DEPTH_VALUES[j]}`,
+						hidden: j < DEPTH_VALUES.length-1,
+						order: 10 - j
+					});
 				}
+				
+				whiteData.datasets.push({
+					data: whiteEvaluation,
+					tension: 0,
+					label: `Evaluation`,
+					hidden: true,
+      				borderDash: [2, 2],
+					order: -10
+				});
+				blackData.datasets.push({
+					data: blackEvaluation,
+					tension: 0,
+					label: `Evaluation`,
+					hidden: true,
+      				borderDash: [2, 2],
+					order: -10
+				});
 
-				console.log(graph_data)
-				Plotly.newPlot(plot.id, graph_data);
+				whiteChart.update();
+				blackChart.update();
 			});
-
 		};
-
-		Plotly.newPlot(plot.id, graph_data).then(
-			() => {
-				updateGraph();
-				setInterval(updateGraph, QUERY_INTERVAL * 1000);
-			}
-		);
-
-
+		updateGraph();
+		// 	//setInterval(updateGraph, QUERY_INTERVAL * 1000);
     });
 	
 </script>
 
 
 <main class = "graph-panel">
-	<div id="hahahah" bind:this={plot}>
+	<div>
+		<canvas id="white-graph" bind:this={whiteGraph}>
+		</canvas>
+	</div>
+	<br/>
+	<div>
+		<canvas id="black-graph" bind:this={blackGraph}>
+		</canvas>
 	</div>
 </main>
 
@@ -104,6 +199,9 @@
 <style>
 	main {
 		display: flex;
-		flex-direction: row;
+		flex-direction: column;
+	}
+	main > div {
+		max-width: 600px;
 	}
 </style>
