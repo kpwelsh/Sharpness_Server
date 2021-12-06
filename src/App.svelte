@@ -1,7 +1,8 @@
 <script>
     //import {Chessboard} from "cm-chessboard"
+	import Chessboard from "chessboardjs";
 	import Chart from 'chart.js/auto';
-	import { data } from './example.js'
+	import { data } from './example.js';
 	import { onMount } from 'svelte';
 
 	let whiteGraph, blackGraph;
@@ -11,7 +12,6 @@
 
 	let FENS = [];
 	let board;
-
 
 	let COLORS = [
 		'#377eb8',
@@ -179,8 +179,7 @@
 					order: -10
 				});
 
-				
-				//new Chessboard(board, {position: FENS[FENS.length - 1]});
+				Chessboard(board.id, FENS[FENS.length - 1]);
 				whiteChart.update();
 				blackChart.update();
 			});
@@ -205,17 +204,28 @@
 		</div>
 	</graph-panel>
 
-	<div>
-		<board bind:this={board}></board>
-	</div>
+	<boardContainer>
+		<div id="board" bind:this={board} style="width: 400px;"></div>
+	</boardContainer>
 </main>
+
 
 <style>
 	graph-panel {
+		width: 500px;
 		display: flex;
 		flex-direction: column;
+		margin-right: 50px;
 	}
 	graph-panel > div {
 		max-width: 600px;
+	}
+	main {
+		display: flex;
+		flex-direction: row;
+	}
+	boardContainer {
+		margin-bottom: auto;
+		margin-top: auto;
 	}
 </style>
